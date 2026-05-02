@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Dummies Build – Fix It</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --red:#ff3c3c; --green:#00c853; --yellow:#ffb300; --orange:#ff7c00;
+  --blue:#4e8eff; --purple:#b04eff;
+  --bg:#0a0a0a; --surface:#141414; --surface2:#1e1e1e;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+  --text:#fff; --muted:#3a3a3a; --muted2:#666;
+}
+
+html,body { width:100%; height:100%; background:var(--bg); font-family:'DM Sans',sans-serif; color:var(--text); overflow:hidden; user-select:none; cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E🔧%3C/text%3E%3C/svg%3E") 4 28, crosshair; }
+
+/* ── NOISE OVERLAY ── */
+body::after { content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity:0.4;
+}
+
+/* ── SCREENS ── */
+.screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; opacity:0; pointer-events:none; transition:opacity 0.5s ease; }
+.screen.active { opacity:1; pointer-events:all; }
+
+/* ════════════════════════════════
+   START SCREEN
+════════════════════════════════ */
+#start { background:var(--bg); text-align:center; }
+#start::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 35%, rgba(255,60,60,0.1) 0%, transparent 60%); pointer-events:none; }
+
+/* Scanlines */
+#start::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px); pointer-events:none; }
+
+.brand-tag { font-family:'DM Mono',monospace; font-size:11px; color:var(--red); letter-spacing:3px; text-transform:uppercase; border:1px solid rgba(255,60,60,0.3); padding:5px 16px; border-radius:100px; margin-bottom:20px; position:relative; z-index:1; display:inline-block; }
+
+.hero-wrap { position:relative; z-index:1; margin-bottom:8px; }
+.device-hero { font-size:88px; display:block; animation:float 3s ease-in-out infinite; }
+@keyframes float { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-12px) rotate(2deg)} }
+
+.hero-ring { position:absolute; inset:-16px; border-radius:50%; border:2px solid rgba(255,60,60,0.15); animation:spin 8s linear infinite; }
+.hero-ring::before { content:''; position:absolute; top:-4px; left:50%; width:8px; height:8px; background:var(--red); border-radius:50%; transform:translateX(-50%); }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+#start h1 { font-family:'Bebas Neue',sans-serif; font-size:clamp(56px,13vw,88px); line-height:0.88; letter-spacing:3px; position:relative; z-index:1; margin-bottom:6px; }
+#start h1 .acc { color:var(--red); }
+#start h1 .acc2 { color:var(--yellow); }
+
+.tagline { font-size:13px; color:var(--muted2); margin-bottom:28px; position:relative; z-index:1; line-height:1.5; }
+
+/* High score banner */
+#hs-banner { font-family:'DM Mono',monospace; font-size:12px; color:var(--yellow); background:rgba(255,179,0,0.08); border:1px solid rgba(255,179,0,0.2); padding:5px 16px; border-radius:8px; margin-bottom:22px; position:relative; z-index:1; display:none; }
+
+.device-select { display:flex; gap:10px; margin-bottom:24px; position:relative; z-index:1; }
+.dsel { background:var(--surface); border:2px solid var(--border); border-radius:14px; padding:12px 16px; cursor:pointer; transition:border-color 0.2s, transform 0.15s, box-shadow 0.2s; font-size:28px; text-align:center; min-width:80px; }
+.dsel span { display:block; font-size:10px; color:var(--muted2); margin-top:4px; font-family:'DM Mono',monospace; letter-spacing:1px; }
+.dsel.picked { border-color:var(--red); box-shadow:0 0 20px rgba(255,60,60,0.2); }
+.dsel:active { transform:scale(0.92); }
+
+.diff-row { display:flex; gap:8px; margin-bottom:28px; position:relative; z-index:1; }
+.diff-btn { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; padding:7px 14px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--muted2); cursor:pointer; transition:all 0.2s; }
+.diff-btn.sel { background:rgba(255,255,255,0.07); border-color:var(--border2); color:var(--text); }
+.diff-btn:active { transform:scale(0.94); }
+
+.btn-start { font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:3px; background:var(--red); color:#fff; border:none; padding:18px 56px; border-radius:16px; cursor:pointer; position:relative; z-index:1; transition:transform 0.15s, box-shadow 0.2s; box-shadow:0 0 40px rgba(255,60,60,0.35), 0 8px 24px rgba(0,0,0,0.4); }
+.btn-start:hover { box-shadow:0 0 60px rgba(255,60,60,0.5), 0 8px 24px rgba(0,0,0,0.4); }
+.btn-start:active { transform:scale(0.95); }
+
+/* ════════════════════════════════
+   GAME SCREEN
+════════════════════════════════ */
+#game { background:var(--bg); justify-content:flex-start; padding:0; }
+#game::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.08) 3px,rgba(0,0,0,0.08) 4px); pointer-events:none; z-index:0; }
+
+/* HUD */
+#hud { width:100%; padding:12px 16px 8px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); flex-shrink:0; position:relative; z-index:10; gap:12px; }
+.hud-brand { font-family:'Bebas Neue',sans-serif; font-size:16px; color:var(--muted); letter-spacing:3px; }
+
+.hud-center { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; }
+#score-disp { font-family:'Bebas Neue',sans-serif; font-size:32px; color:var(--text); line-height:1; transition:transform 0.1s; }
+#score-disp.pop { animation:scorepop 0.2s ease; }
+@keyframes scorepop { 0%{transform:scale(1)} 50%{transform:scale(1.25)} 100%{transform:scale(1)} }
+
+#combo-strip { display:flex; gap:4px; }
+.cdot { width:9px; height:9px; border-radius:50%; background:var(--muted); transition:background 0.15s, transform 0.15s, box-shadow 0.15s; }
+.cdot.lit { background:var(--yellow); transform:scale(1.25); box-shadow:0 0 6px var(--yellow); }
+.cdot.fire { background:var(--orange); transform:scale(1.4); box-shadow:0 0 10px var(--orange); animation:firepulse 0.4s ease infinite alternate; }
+@keyframes firepulse { to{box-shadow:0 0 18px var(--red);} }
+
+#timer-wrap { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+#timer-disp { font-family:'DM Mono',monospace; font-size:24px; font-weight:500; color:var(--green); min-width:44px; text-align:right; line-height:1; }
+#timer-disp.warn { color:var(--yellow); }
+#timer-disp.crit { color:var(--red); animation:blink 0.45s ease infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.hud-label { font-family:'DM Mono',monospace; font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+
+/* Timer bar */
+#tbar-wrap { width:100%; height:4px; background:rgba(255,255,255,0.05); flex-shrink:0; position:relative; z-index:10; }
+#tbar { height:100%; background:var(--green); width:100%; transition:background 0.5s; }
+
+/* Stage banner */
+#stage-banner { width:100%; flex-shrink:0; padding:6px 16px; display:flex; align-items:center; justify-content:space-between; position:relative; z-index:10; }
+#stage-label { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted2); letter-spacing:2px; text-transform:uppercase; }
+#stage-progress { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:1px; }
+
+/* ── DEVICE AREA ── */
+#device-area { flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; z-index:1; }
+
+/* Vignette */
+#device-area::after { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0,0,0,0.5) 100%); pointer-events:none; z-index:5; }
+
+.device-frame { position:relative; width:min(260px,68vw); aspect-ratio:9/13; filter:drop-shadow(0 24px 48px rgba(0,0,0,0.7)); }
+.device-body { width:100%; height:100%; background:linear-gradient(145deg,#1c1c1c,#0f0f0f); border-radius:26px; border:2px solid rgba(255,255,255,0.1); position:relative; overflow:visible; }
+
+/* Device glint */
+.device-body::before { content:''; position:absolute; top:0; left:10%; right:10%; height:50%; border-radius:26px 26px 50% 50%/20px 20px 8px 8px; background:linear-gradient(180deg,rgba(255,255,255,0.06) 0%,transparent 100%); pointer-events:none; }
+
+.device-screen { position:absolute; inset:16px; border-radius:16px; background:#000; display:flex; align-items:center; justify-content:center; font-size:clamp(30px,9vw,48px); overflow:hidden; transition:background 0.5s; }
+
+/* Screen CRT scanlines */
+.device-screen::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.2) 2px,rgba(0,0,0,0.2) 4px); pointer-events:none; }
+
+/* Screen glow pulse on combo */
+.device-screen.glow { animation:glowpulse 0.4s ease; }
+@keyframes glowpulse { 0%{box-shadow:inset 0 0 0 rgba(255,200,0,0)} 50%{box-shadow:inset 0 0 30px rgba(255,200,0,0.3)} 100%{box-shadow:inset 0 0 0 rgba(255,200,0,0)} }
+
+/* Health bar on device side */
+#health-wrap { position:absolute; left:-14px; top:20%; bottom:20%; width:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden; }
+#health-bar { position:absolute; bottom:0; left:0; right:0; background:var(--green); border-radius:3px; transition:height 0.4s ease, background 0.4s; }
+
+/* ── BUGS ── */
+.bug { position:absolute; width:56px; height:56px; display:flex; align-items:center; justify-content:center; font-size:28px; border-radius:50%; cursor:pointer; z-index:20; animation:bugpop 0.35s cubic-bezier(0.34,1.56,0.64,1) both; }
+.bug::before { content:''; position:absolute; inset:0; border-radius:50%; border:2px solid rgba(255,60,60,0.5); background:rgba(255,60,60,0.1); transition:border-color 0.2s; }
+.bug::after { content:''; position:absolute; inset:-6px; border-radius:50%; border:1px solid rgba(255,60,60,0.15); animation:bugradar 1.5s ease-out infinite; }
+@keyframes bugradar { 0%{transform:scale(1);opacity:0.5} 100%{transform:scale(1.6);opacity:0} }
+@keyframes bugpop { from{transform:scale(0) rotate(-30deg)} to{transform:scale(1) rotate(0deg)} }
+
+.bug:active { transform:scale(0.8) !important; }
+
+.bug.panic::before { border-color:rgba(255,179,0,0.6); background:rgba(255,179,0,0.1); }
+.bug.panic::after { border-color:rgba(255,179,0,0.2); }
+.bug.boss::before { border-color:rgba(176,78,255,0.7); background:rgba(176,78,255,0.12); }
+.bug.boss::after { border-color:rgba(176,78,255,0.25); animation-duration:0.8s; }
+
+.bug.fixed { animation:bugfix 0.45s cubic-bezier(0.36,0.07,0.19,0.97) forwards; pointer-events:none; }
+@keyframes bugfix { 0%{transform:scale(1)} 20%{transform:scale(1.4) rotate(10deg)} 60%{transform:scale(0.6) rotate(-5deg)} 100%{transform:scale(0);opacity:0} }
+
+/* Freeze bug */
+.bug.frozen::before { border-color:rgba(78,142,255,0.7); background:rgba(78,142,255,0.1); }
+.bug.frozen { animation:bugpop 0.35s cubic-bezier(0.34,1.56,0.64,1) both; }
+.bug.frozen::after { border-color:rgba(78,142,255,0.25); }
+
+/* ── PARTICLES ── */
+.particle { position:absolute; width:6px; height:6px; border-radius:50%; pointer-events:none; z-index:30; animation:particle-fly var(--dur,0.6s) ease forwards; }
+@keyframes particle-fly { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0} }
+
+/* ── FLOATING SCORE ── */
+.float-score { position:absolute; font-family:'Bebas Neue',sans-serif; font-size:clamp(18px,5vw,26px); pointer-events:none; z-index:40; animation:floatup var(--dur,0.8s) ease forwards; white-space:nowrap; }
+@keyframes floatup { 0%{opacity:1;transform:translateY(0) scale(1)} 60%{opacity:1;transform:translateY(-30px) scale(1.1)} 100%{opacity:0;transform:translateY(-60px) scale(0.8)} }
+
+/* ── COMBO FLASH ── */
+#combo-flash { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:50; opacity:0; }
+#combo-flash .cf-text { font-family:'Bebas Neue',sans-serif; font-size:clamp(48px,15vw,80px); letter-spacing:4px; text-shadow:0 0 40px currentColor; }
+#combo-flash.show { animation:comboflash 0.7s ease forwards; }
+@keyframes comboflash { 0%{opacity:0;transform:scale(0.5)} 30%{opacity:1;transform:scale(1.1)} 70%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.2)} }
+
+/* ── MISS FLASH ── */
+#miss-flash { position:absolute; inset:0; background:rgba(255,60,60,0); pointer-events:none; z-index:45; }
+#miss-flash.show { animation:missflash 0.4s ease forwards; }
+@keyframes missflash { 0%{background:rgba(255,60,60,0.25)} 100%{background:rgba(255,60,60,0)} }
+
+/* ── SHAKE ── */
+.shake { animation:screenshake 0.4s cubic-bezier(0.36,0.07,0.19,0.97) both; }
+@keyframes screenshake {
+  10%,90%{transform:translate(-2px,0)} 20%,80%{transform:translate(3px,0)}
+  30%,50%,70%{transform:translate(-3px,0)} 40%,60%{transform:translate(3px,0)}
+}
+
+/* ── BONUS TIME FLASH ── */
+#bonus-flash { position:absolute; top:80px; left:50%; transform:translateX(-50%); font-family:'Bebas Neue',sans-serif; font-size:28px; color:var(--green); pointer-events:none; z-index:60; opacity:0; white-space:nowrap; text-shadow:0 0 20px var(--green); }
+#bonus-flash.show { animation:bonusflash 1.2s ease forwards; }
+@keyframes bonusflash { 0%{opacity:0;transform:translateX(-50%) translateY(10px)} 20%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0;transform:translateX(-50%) translateY(-20px)} }
+
+/* ── BOTTOM HUD ── */
+#bottom-hud { width:100%; padding:8px 16px 12px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--border); position:relative; z-index:10; }
+#lives-area { display:flex; gap:5px; }
+.life { font-size:16px; transition:transform 0.2s, filter 0.2s; }
+.life.lost { filter:grayscale(1) opacity(0.3); transform:scale(0.8); }
+#miss-label { font-family:'DM Mono',monospace; font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
+#fire-mode { font-family:'DM Mono',monospace; font-size:11px; color:var(--orange); letter-spacing:2px; text-transform:uppercase; opacity:0; transition:opacity 0.3s; text-shadow:0 0 12px var(--orange); }
+#fire-mode.on { opacity:1; animation:firetxt 0.5s ease infinite alternate; }
+@keyframes firetxt { to{color:var(--red);text-shadow:0 0 20px var(--red)} }
+
+/* ════════════════════════════════
+   RESULTS SCREEN
+════════════════════════════════ */
+#results { background:var(--bg); text-align:center; }
+#results::before { content:''; position:absolute; inset:0; pointer-events:none; }
+#results.win::before { background:radial-gradient(ellipse at 50% 40%,rgba(0,200,83,0.1) 0%,transparent 65%); }
+#results.lose::before { background:radial-gradient(ellipse at 50% 40%,rgba(255,60,60,0.08) 0%,transparent 65%); }
+
+#result-icon { font-size:80px; margin-bottom:10px; position:relative; z-index:1; animation:resultbounce 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes resultbounce { from{transform:scale(0) rotate(-20deg)} to{transform:scale(1) rotate(0)} }
+
+#results h2 { font-family:'Bebas Neue',sans-serif; font-size:clamp(48px,12vw,72px); letter-spacing:3px; position:relative; z-index:1; margin-bottom:4px; line-height:1; }
+.win #results h2, #result-title.win-col { color:var(--green); }
+#result-sub { font-size:14px; color:var(--muted2); margin-bottom:6px; position:relative; z-index:1; }
+
+/* New high score */
+#new-hs { font-family:'DM Mono',monospace; font-size:12px; color:var(--yellow); background:rgba(255,179,0,0.1); border:1px solid rgba(255,179,0,0.25); padding:5px 16px; border-radius:100px; margin-bottom:20px; position:relative; z-index:1; display:none; letter-spacing:1px; }
+
+.stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; max-width:320px; margin-bottom:20px; position:relative; z-index:1; }
+.stat-box { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; text-align:left; }
+.stat-box .sv { font-family:'Bebas Neue',sans-serif; font-size:34px; color:var(--text); line-height:1; }
+.stat-box .sl { font-size:10px; color:var(--muted2); font-family:'DM Mono',monospace; text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+
+/* Grade badge */
+#grade-badge { width:100%; max-width:320px; background:var(--surface2); border:1px solid var(--border2); border-radius:14px; padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; gap:12px; position:relative; z-index:1; }
+#grade-letter { font-family:'Bebas Neue',sans-serif; font-size:52px; line-height:1; min-width:48px; }
+#grade-desc { text-align:left; }
+#grade-desc .gd-title { font-size:13px; font-weight:700; color:var(--text); }
+#grade-desc .gd-sub { font-size:12px; color:var(--muted2); margin-top:2px; }
+
+.btn-row { display:flex; gap:10px; position:relative; z-index:1; }
+.btn-again { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; background:var(--red); color:#fff; border:none; padding:14px 32px; border-radius:14px; cursor:pointer; transition:transform 0.15s, box-shadow 0.2s; box-shadow:0 0 24px rgba(255,60,60,0.25); }
+.btn-again:active { transform:scale(0.95); }
+.btn-menu { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; background:transparent; color:var(--muted2); border:1px solid var(--border); padding:14px 24px; border-radius:14px; cursor:pointer; transition:all 0.2s; }
+.btn-menu:hover { border-color:var(--border2); color:var(--text); }
+.btn-menu:active { transform:scale(0.95); }
+.share-line { font-size:11px; color:var(--muted); margin-top:14px; position:relative; z-index:1; font-family:'DM Mono',monospace; letter-spacing:1px; }
+.share-line span { color:var(--red); }
+</style>
+</head>
+<body>
+
+<!-- ══════════ START ══════════ -->
+<div class="screen active" id="start">
+  <div class="brand-tag">Dummies Build</div>
+  <div class="hero-wrap">
+    <span class="device-hero" id="hero-emo">💻</span>
+    <div class="hero-ring"></div>
+  </div>
+  <h1>FIX THE<br><span class="acc">DEVICE</span></h1>
+  <p class="tagline">Tap the faults before time runs out.<br>Don't brick it.</p>
+  <div id="hs-banner">🏆 HIGH SCORE: <span id="hs-val">0</span></div>
+
+  <div class="device-select" id="dsel-wrap">
+    <div class="dsel picked" data-emo="💻" data-name="LAPTOP" onclick="pickDevice(this)">💻<span>Laptop</span></div>
+    <div class="dsel" data-emo="📱" data-name="PHONE" onclick="pickDevice(this)">📱<span>Phone</span></div>
+    <div class="dsel" data-emo="🖥️" data-name="DESKTOP" onclick="pickDevice(this)">🖥️<span>Desktop</span></div>
+    <div class="dsel" data-emo="⌚" data-name="WATCH" onclick="pickDevice(this)">⌚<span>Watch</span></div>
+  </div>
+
+  <div class="diff-row">
+    <button class="diff-btn sel" onclick="pickDiff(this,'easy')">Easy</button>
+    <button class="diff-btn" onclick="pickDiff(this,'normal')">Normal</button>
+    <button class="diff-btn" onclick="pickDiff(this,'hard')">Hard</button>
+  </div>
+
+  <button class="btn-start" onclick="startGame()">START REPAIR</button>
+</div>
+
+<!-- ══════════ GAME ══════════ -->
+<div class="screen" id="game">
+  <div id="hud">
+    <div class="hud-brand">DB</div>
+    <div class="hud-center">
+      <div id="score-disp">0</div>
+      <div id="combo-strip"></div>
+    </div>
+    <div id="timer-wrap">
+      <div id="timer-disp">30</div>
+      <div class="hud-label">secs</div>
+    </div>
+  </div>
+  <div id="tbar-wrap"><div id="tbar"></div></div>
+  <div id="stage-banner">
+    <div id="stage-label">Stage 1</div>
+    <div id="stage-progress">0 / 3</div>
+  </div>
+
+  <div id="device-area">
+    <div class="device-frame" id="dframe">
+      <div class="device-body">
+        <div class="device-screen" id="dscreen">
+          <span id="dscreen-emo">💀</span>
+        </div>
+        <div id="health-wrap"><div id="health-bar" style="height:100%"></div></div>
+      </div>
+    </div>
+    <div id="combo-flash"><div class="cf-text" id="cf-text">COMBO!</div></div>
+    <div id="miss-flash"></div>
+    <div id="bonus-flash">+8 SECONDS ⚡</div>
+  </div>
+
+  <div id="bottom-hud">
+    <div>
+      <div id="lives-area"></div>
+      <div id="miss-label">lives</div>
+    </div>
+    <div id="fire-mode">🔥 FIRE MODE</div>
+  </div>
+</div>
+
+<!-- ══════════ RESULTS ══════════ -->
+<div class="screen" id="results">
+  <div id="result-icon">🔧</div>
+  <h2 id="result-title">REPAIRED!</h2>
+  <p id="result-sub">Not bad for a dummy.</p>
+  <div id="new-hs">🏆 NEW HIGH SCORE!</div>
+  <div id="grade-badge">
+    <div id="grade-letter">B</div>
+    <div id="grade-desc">
+      <div class="gd-title" id="grade-title">Decent Work</div>
+      <div class="gd-sub" id="grade-sub">Keep practising your repairs</div>
+    </div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="sv" id="r-score">0</div><div class="sl">Score</div></div>
+    <div class="stat-box"><div class="sv" id="r-fixed">0</div><div class="sl">Bugs Fixed</div></div>
+    <div class="stat-box"><div class="sv" id="r-combo">0x</div><div class="sl">Best Combo</div></div>
+    <div class="stat-box"><div class="sv" id="r-stage">1</div><div class="sl">Stage Reached</div></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn-again" onclick="quickRestart()">RETRY</button>
+    <button class="btn-menu" onclick="resetGame()">MENU</button>
+  </div>
+  <p class="share-line">SCORE: <span id="r-score2">0</span> — <span>#DummiesBuild</span></p>
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════
+const DIFF = {
+  easy:   { time:20, spawnMult:1.0, missAllowed:3 },
+  normal: { time:15, spawnMult:0.7, missAllowed:2 },
+  hard:   { time:10, spawnMult:0.4, missAllowed:1 },
+};
+
+const STAGES = [
+  { name:'Power Issue',     bugs:['⚡','🔋','🪫'],        screen:'💀', count:5,  spawnMs:1400, panicChance:0.15 },
+  { name:'Thermal Fault',   bugs:['🌡️','🔥','💨'],        screen:'🥵', count:6,  spawnMs:1200, panicChance:0.35 },
+  { name:'Software Crash',  bugs:['💾','🐛','⚠️'],        screen:'😵', count:7,  spawnMs:1050, panicChance:0.5  },
+  { name:'Board Damage',    bugs:['⚙️','🔩','💥'],        screen:'🤖', count:8,  spawnMs:900,  panicChance:0.65 },
+  { name:'FINAL BOSS',      bugs:['☠️','🔴','❌','👾'],   screen:'😱', count:10, spawnMs:700,  panicChance:0.8  },
+];
+
+const GRADE_THRESHOLDS = [
+  { min:400, letter:'S', col:'#ffb300', title:'Legendary Tech', sub:'You could fix anything. Absolute unit.' },
+  { min:280, letter:'A', col:'#00c853', title:'Pro Repair Tech', sub:'Clean work. Not a dummy at all.' },
+  { min:180, letter:'B', col:'#4e8eff', title:'Getting There', sub:'Could be worse. Could be better.' },
+  { min:80,  letter:'C', col:'#ff7c00', title:'Amateur Hour',   sub:'Back to YouTube tutorials for you.' },
+  { min:0,   letter:'D', col:'#ff3c3c', title:'Total Dummy',    sub:'Should\'ve left it in the box.' },
+];
+
+const COMBO_MAX = 5;
+const BONUS_TIME = 5;
+
+// ══════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════
+let deviceEmo = '💻', deviceName = 'LAPTOP';
+let difficulty = 'easy';
+let score = 0, bugsFixed = 0, combo = 0, bestCombo = 0, stageIdx = 0;
+let timeLeft = 30, totalTime = 30;
+let timerInterval = null, spawnTimeout = null;
+let activeBugs = [], panicTimers = [];
+let bugsInStage = 0, bugsNeeded = 0;
+let gameRunning = false;
+let lives = 3, maxLives = 3;
+let highScore = 0;
+let lastDeviceEmo = '💻', lastDiff = 'easy';
+
+// Load high score
+try { highScore = parseInt(localStorage.getItem('db_hs') || '0'); } catch(e){}
+
+// ══════════════════════════════════════
+//  SETUP
+// ══════════════════════════════════════
+function pickDevice(el) {
+  document.querySelectorAll('.dsel').forEach(d => d.classList.remove('picked'));
+  el.classList.add('picked');
+  deviceEmo = el.dataset.emo;
+  deviceName = el.dataset.name;
+  document.getElementById('hero-emo').textContent = deviceEmo;
+}
+
+function pickDiff(el, d) {
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  difficulty = d;
+}
+
+function updateHSBanner() {
+  if (highScore > 0) {
+    document.getElementById('hs-banner').style.display = 'inline-block';
+    document.getElementById('hs-val').textContent = highScore;
+  }
+}
+
+// ══════════════════════════════════════
+//  GAME START
+// ══════════════════════════════════════
+function startGame() {
+  lastDeviceEmo = deviceEmo; lastDiff = difficulty;
+  const cfg = DIFF[difficulty];
+  score = 0; bugsFixed = 0; combo = 0; bestCombo = 0; stageIdx = 0;
+  lives = maxLives = cfg.missAllowed;
+  timeLeft = totalTime = cfg.time;
+  bugsInStage = 0; gameRunning = true; activeBugs = []; panicTimers = [];
+
+  showScreen('game');
+  buildLives();
+  buildCombo();
+  updateHUD();
+  loadStage();
+  startTimer();
+}
+
+function quickRestart() {
+  deviceEmo = lastDeviceEmo; difficulty = lastDiff;
+  startGame();
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ══════════════════════════════════════
+//  TIMER
+// ══════════════════════════════════════
+function startTimer() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft = Math.max(0, timeLeft - 0.1);
+    updateTimerUI();
+    if (timeLeft <= 0) endGame();
+  }, 100);
+}
+
+function updateTimerUI() {
+  const el = document.getElementById('timer-disp');
+  const tbar = document.getElementById('tbar');
+  const pct = timeLeft / totalTime;
+  el.textContent = Math.ceil(timeLeft);
+  tbar.style.width = (pct * 100) + '%';
+  el.className = '';
+  if (pct < 0.2) { el.className='crit'; tbar.style.background='var(--red)'; }
+  else if (pct < 0.4) { el.className='warn'; tbar.style.background='var(--yellow)'; }
+  else { tbar.style.background='var(--green)'; }
+}
+
+// ══════════════════════════════════════
+//  STAGES
+// ══════════════════════════════════════
+function loadStage() {
+  if (!gameRunning) return;
+  const st = STAGES[Math.min(stageIdx, STAGES.length - 1)];
+  bugsNeeded = st.count;
+  bugsInStage = 0;
+  clearAllBugs();
+  document.getElementById('stage-label').textContent = `Stage ${stageIdx+1} — ${st.name}`;
+  document.getElementById('dscreen-emo').textContent = st.screen;
+  document.getElementById('dscreen').style.background = '#000';
+  updateStageProgress();
+  scheduleBug();
+}
+
+function updateStageProgress() {
+  document.getElementById('stage-progress').textContent = `${bugsInStage} / ${bugsNeeded}`;
+  const pct = bugsInStage / bugsNeeded;
+  document.getElementById('health-bar').style.height = (pct * 100) + '%';
+  const col = pct < 0.4 ? 'var(--red)' : pct < 0.7 ? 'var(--yellow)' : 'var(--green)';
+  document.getElementById('health-bar').style.background = col;
+}
+
+// ══════════════════════════════════════
+//  BUG SPAWNING
+// ══════════════════════════════════════
+function scheduleBug() {
+  if (!gameRunning) return;
+  const st = STAGES[Math.min(stageIdx, STAGES.length - 1)];
+  const cfg = DIFF[difficulty];
+  if (activeBugs.length < 6) spawnBug();
+  const delay = st.spawnMs * cfg.spawnMult;
+  spawnTimeout = setTimeout(scheduleBug, delay);
+}
+
+function spawnBug() {
+  const st = STAGES[Math.min(stageIdx, STAGES.length - 1)];
+  const area = document.getElementById('device-area');
+  const frame = document.getElementById('dframe');
+  const fr = frame.getBoundingClientRect();
+  const ar = area.getBoundingClientRect();
+
+  const bug = document.createElement('div');
+  bug.className = 'bug';
+  const emo = st.bugs[Math.floor(Math.random() * st.bugs.length)];
+  bug.textContent = emo;
+
+  const pad = 28;
+  const x = (fr.left - ar.left) + pad + Math.random() * (fr.width - pad*2 - 56);
+  const y = (fr.top - ar.top) + pad + Math.random() * (fr.height - pad*2 - 56);
+  bug.style.left = x + 'px';
+  bug.style.top = y + 'px';
+
+  const isBoss = stageIdx === STAGES.length - 1;
+  const isPanic = !isBoss && Math.random() < st.panicChance;
+
+  if (isBoss) bug.classList.add('boss');
+  else if (isPanic) { bug.classList.add('panic'); startPanic(bug, ar); }
+
+  bug.addEventListener('pointerdown', (e) => { e.preventDefault(); fixBug(bug, e); });
+  area.appendChild(bug);
+  activeBugs.push(bug);
+}
+
+function startPanic(bug, ar) {
+  function move() {
+    if (!bug.parentNode || bug.classList.contains('fixed')) return;
+    const nx = 20 + Math.random() * (ar.width - 80);
+    const ny = 20 + Math.random() * (ar.height - 80);
+    bug.style.transition = 'left 0.5s ease, top 0.5s ease';
+    bug.style.left = nx + 'px';
+    bug.style.top = ny + 'px';
+    const t = setTimeout(move, 500 + Math.random() * 300);
+    panicTimers.push(t);
+  }
+  const t = setTimeout(move, 400);
+  panicTimers.push(t);
+}
+
+// ══════════════════════════════════════
+//  FIX BUG
+// ══════════════════════════════════════
+function fixBug(bug, e) {
+  if (bug.classList.contains('fixed')) return;
+  bug.classList.add('fixed');
+  activeBugs = activeBugs.filter(b => b !== bug);
+
+  combo++;
+  if (combo > bestCombo) bestCombo = combo;
+  const isFire = combo >= COMBO_MAX;
+  const multiplier = Math.min(combo, COMBO_MAX);
+  const pts = 10 * multiplier;
+  score += pts;
+  bugsFixed++;
+  bugsInStage++;
+
+  updateHUD();
+  updateComboUI();
+  updateStageProgress();
+  spawnParticles(bug, isFire);
+  showFloatScore(bug, pts, isFire);
+
+  // Screen glow
+  const screen = document.getElementById('dscreen');
+  screen.classList.remove('glow');
+  void screen.offsetWidth;
+  screen.classList.add('glow');
+
+  // Combo flash at milestones
+  if (combo === 3 || combo === 5 || combo === 10) showComboFlash(combo);
+
+  // Fire mode indicator
+  document.getElementById('fire-mode').classList.toggle('on', isFire);
+
+  // Stage colour progress
+  const pct = bugsInStage / bugsNeeded;
+  const g = Math.round(pct * 180);
+  screen.style.background = `rgba(0,${g},${Math.round(g*0.4)},0.25)`;
+
+  if (bugsInStage >= bugsNeeded) completeStage();
+}
+
+function completeStage() {
+  clearTimeout(spawnTimeout);
+  clearAllBugs();
+  stageIdx++;
+  timeLeft = Math.min(timeLeft + BONUS_TIME, totalTime);
+  showBonusFlash();
+
+  if (stageIdx < STAGES.length) {
+    document.getElementById('dscreen-emo').textContent = '✅';
+    document.getElementById('dscreen').style.background = 'rgba(0,200,83,0.25)';
+    combo = 0; updateComboUI();
+    document.getElementById('fire-mode').classList.remove('on');
+    setTimeout(loadStage, 1000);
+  } else {
+    document.getElementById('dscreen-emo').textContent = '🏆';
+    document.getElementById('dscreen').style.background = 'rgba(0,200,83,0.35)';
+    setTimeout(endGame, 1200);
+  }
+}
+
+// ══════════════════════════════════════
+//  MISSES (click background)
+// ══════════════════════════════════════
+document.getElementById('device-area').addEventListener('pointerdown', (e) => {
+  if (!gameRunning) return;
+  if (e.target.classList.contains('bug') || e.target.closest('.bug')) return;
+  if (e.target.id === 'device-area' || e.target.closest('.device-frame')) {
+    if (!e.target.classList.contains('bug')) missClick();
+  }
+});
+
+function missClick() {
+  combo = 0;
+  updateComboUI();
+  document.getElementById('fire-mode').classList.remove('on');
+  lives--;
+  updateLives();
+  // Screen shake
+  document.getElementById('game').classList.remove('shake');
+  void document.getElementById('game').offsetWidth;
+  document.getElementById('game').classList.add('shake');
+  // Miss flash
+  const mf = document.getElementById('miss-flash');
+  mf.classList.remove('show');
+  void mf.offsetWidth;
+  mf.classList.add('show');
+  if (lives <= 0) endGame();
+}
+
+// ══════════════════════════════════════
+//  PARTICLES
+// ══════════════════════════════════════
+function spawnParticles(bug, fire) {
+  const area = document.getElementById('device-area');
+  const count = fire ? 12 : 6;
+  const colors = fire ? ['#ff3c3c','#ff7c00','#ffb300'] : ['#00c853','#4e8eff','#fff'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (i / count) * Math.PI * 2;
+    const dist = 30 + Math.random() * 40;
+    p.style.setProperty('--tx', Math.cos(angle)*dist + 'px');
+    p.style.setProperty('--ty', Math.sin(angle)*dist + 'px');
+    p.style.setProperty('--dur', (0.4 + Math.random()*0.3) + 's');
+    p.style.background = colors[Math.floor(Math.random()*colors.length)];
+    p.style.left = (parseFloat(bug.style.left) + 25) + 'px';
+    p.style.top = (parseFloat(bug.style.top) + 25) + 'px';
+    p.style.width = p.style.height = (fire ? 8 : 5) + 'px';
+    area.appendChild(p);
+    setTimeout(() => p.remove(), 800);
+  }
+}
+
+function showFloatScore(bug, pts, fire) {
+  const area = document.getElementById('device-area');
+  const el = document.createElement('div');
+  el.className = 'float-score';
+  el.textContent = '+' + pts;
+  el.style.color = fire ? 'var(--orange)' : 'var(--green)';
+  el.style.left = (parseFloat(bug.style.left) + 10) + 'px';
+  el.style.top = parseFloat(bug.style.top) + 'px';
+  el.style.setProperty('--dur', '0.9s');
+  if (fire) el.style.textShadow = '0 0 16px var(--orange)';
+  area.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+function showComboFlash(n) {
+  const labels = {3:'TRIPLE!', 5:'ON FIRE! 🔥', 10:'INSANE!! 💥'};
+  const colors = {3:'var(--blue)', 5:'var(--orange)', 10:'var(--yellow)'};
+  const cf = document.getElementById('combo-flash');
+  const ct = document.getElementById('cf-text');
+  ct.textContent = labels[n] || `${n}X COMBO!`;
+  ct.style.color = colors[n] || 'var(--yellow)';
+  cf.classList.remove('show');
+  void cf.offsetWidth;
+  cf.classList.add('show');
+}
+
+function showBonusFlash() {
+  const bf = document.getElementById('bonus-flash');
+  bf.classList.remove('show');
+  void bf.offsetWidth;
+  bf.classList.add('show');
+}
+
+// ══════════════════════════════════════
+//  HUD UPDATES
+// ══════════════════════════════════════
+function updateHUD() {
+  const sd = document.getElementById('score-disp');
+  sd.textContent = score;
+  sd.classList.remove('pop');
+  void sd.offsetWidth;
+  sd.classList.add('pop');
+}
+
+function buildCombo() {
+  const el = document.getElementById('combo-strip');
+  el.innerHTML = '';
+  for (let i = 0; i < COMBO_MAX; i++) {
+    const d = document.createElement('div'); d.className = 'cdot'; el.appendChild(d);
+  }
+}
+
+function updateComboUI() {
+  document.querySelectorAll('.cdot').forEach((d, i) => {
+    d.classList.remove('lit','fire');
+    if (i < combo) d.classList.add(combo >= COMBO_MAX ? 'fire' : 'lit');
+  });
+}
+
+function buildLives() {
+  const el = document.getElementById('lives-area');
+  el.innerHTML = '';
+  for (let i = 0; i < maxLives; i++) {
+    const l = document.createElement('div'); l.className = 'life'; l.textContent = '🔧'; el.appendChild(l);
+  }
+}
+
+function updateLives() {
+  document.querySelectorAll('.life').forEach((l, i) => l.classList.toggle('lost', i >= lives));
+}
+
+function clearAllBugs() {
+  document.querySelectorAll('.bug').forEach(b => b.remove());
+  activeBugs = [];
+  panicTimers.forEach(clearTimeout); panicTimers = [];
+}
+
+// ══════════════════════════════════════
+//  END GAME
+// ══════════════════════════════════════
+function endGame() {
+  if (!gameRunning) return;
+  gameRunning = false;
+  clearInterval(timerInterval);
+  clearTimeout(spawnTimeout);
+  clearAllBugs();
+
+  const allDone = stageIdx >= STAGES.length;
+  const newHS = score > highScore;
+  if (newHS) { highScore = score; try { localStorage.setItem('db_hs', highScore); } catch(e){} }
+
+  const resultsEl = document.getElementById('results');
+  resultsEl.className = 'screen';
+  resultsEl.classList.add(allDone || score > 60 ? 'win' : 'lose');
+
+  document.getElementById('result-icon').textContent = allDone ? '🏆' : lives <= 0 ? '💀' : score > 100 ? '🔧' : '😬';
+  document.getElementById('result-title').textContent = allDone ? 'FULLY REPAIRED!' : lives <= 0 ? 'BRICKED IT.' : score > 100 ? 'REPAIRED!' : 'TIME\'S UP.';
+  document.getElementById('result-sub').textContent = allDone
+    ? 'Every stage cleared. Absolute legend.'
+    : lives <= 0
+    ? 'You ran out of lives. Back to buying refurbs.'
+    : score > 150 ? 'Solid work. Not bad for a dummy.'
+    : score > 60 ? 'A few bugs survived. Try harder.'
+    : 'The device is still broken, mate.';
+
+  document.getElementById('new-hs').style.display = newHS ? 'inline-block' : 'none';
+
+  // Grade
+  const grade = GRADE_THRESHOLDS.find(g => score >= g.min) || GRADE_THRESHOLDS[GRADE_THRESHOLDS.length-1];
+  document.getElementById('grade-letter').textContent = grade.letter;
+  document.getElementById('grade-letter').style.color = grade.col;
+  document.getElementById('grade-title').textContent = grade.title;
+  document.getElementById('grade-sub').textContent = grade.sub;
+
+  document.getElementById('r-score').textContent = score;
+  document.getElementById('r-score2').textContent = score;
+  document.getElementById('r-fixed').textContent = bugsFixed;
+  document.getElementById('r-combo').textContent = bestCombo + 'x';
+  document.getElementById('r-stage').textContent = Math.min(stageIdx+1, STAGES.length);
+
+  setTimeout(() => showScreen('results'), 700);
+}
+
+function resetGame() {
+  clearAllBugs();
+  updateHSBanner();
+  showScreen('start');
+}
+
+// ══════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════
+updateHSBanner();
+</script>
+</body>
+</html>
